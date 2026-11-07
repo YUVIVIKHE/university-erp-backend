@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,12 @@ public class DataSeeder implements ApplicationRunner {
     private final UserRepository       userRepo;
     private final PermissionRepository permRepo;
     private final PasswordEncoder      encoder;
+
+    @Value("${app.bootstrap.admin-email:}")
+    private String adminEmail;
+
+    @Value("${app.bootstrap.admin-password:}")
+    private String adminPassword;
 
     @Override
     @Transactional
@@ -51,18 +58,19 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     private void seedAdmin() {
-        String email = "admin@university.edu";
+        if (adminEmail == null || adminEmail.isBlank() || adminPassword == null || adminPassword.isBlank()) return;
+        String email = adminEmail.trim();
         if (userRepo.existsByEmail(email)) return;
 
         User admin = User.builder()
             .email(email)
-            .passwordHash(encoder.encode("Admin@1234"))
+            .passwordHash(encoder.encode(adminPassword))
             .fullName("System Administrator")
             .role(User.Role.ADMIN)
             .isActive(true)
             .build();
 
         userRepo.save(admin);
-        log.info("=== Default admin created: {} / Admin@1234 ===", email);
+        log.info("Bootstrap administrator created");
     }
 }

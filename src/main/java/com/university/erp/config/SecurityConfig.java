@@ -18,6 +18,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -40,10 +41,22 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/me").authenticated()
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/finance/**").hasAnyRole("ACCOUNTANT", "ADMIN")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                // Accountant access is limited to explicitly exposed finance APIs.
+                .requestMatchers("/api/**").access((authentication, context) ->
+                    new AuthorizationDecision(authentication.get().isAuthenticated()
+                        && authentication.get().getAuthorities().stream()
+                            .noneMatch(a -> a.getAuthority().equals("ROLE_ACCOUNTANT"))
+                        && authentication.get().getAuthorities().stream()
+                            .noneMatch(a -> a.getAuthority().equals("ROLE_ANONYMOUS"))))
                 .anyRequest().authenticated()
             )
+            .exceptionHandling(errors -> errors
+                .authenticationEntryPoint((request, response, error) -> response.setStatus(401))
+                .accessDeniedHandler((request, response, error) -> response.setStatus(403)))
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
             .build();

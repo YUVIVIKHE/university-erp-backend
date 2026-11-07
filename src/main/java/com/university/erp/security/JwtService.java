@@ -42,10 +42,17 @@ public class JwtService {
     public boolean isValid(String token, UserDetails user) {
         try {
             String username = extractUsername(token);
-            return username.equals(user.getUsername()) && !isExpired(token);
+            Integer version = extractClaim(token, claims -> claims.get("version", Integer.class));
+            int current = user instanceof com.university.erp.entity.User account ? account.getTokenVersion() : 0;
+            return username.equals(user.getUsername()) && user.isEnabled() && !isExpired(token)
+                && (version == null ? 0 : version) == current;
         } catch (JwtException e) {
             return false;
         }
+    }
+
+    public boolean hasType(String token, String type) {
+        return type.equals(extractClaim(token, claims -> claims.get("type", String.class)));
     }
 
     public String extractUsername(String token) {
@@ -69,6 +76,7 @@ public class JwtService {
         Date now = new Date();
         return Jwts.builder()
             .claims(extra)
+            .claim("version", user instanceof com.university.erp.entity.User account ? account.getTokenVersion() : 0)
             .subject(user.getUsername())
             .issuedAt(now)
             .expiration(new Date(now.getTime() + ttlMs))

@@ -34,6 +34,14 @@ public class User implements UserDetails {
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
+    @Builder.Default
+    @Column(name = "invitation_pending", nullable = false, columnDefinition = "boolean default false")
+    private boolean invitationPending = false;
+
+    @Builder.Default
+    @Column(name = "token_version", nullable = false, columnDefinition = "integer default 0")
+    private int tokenVersion = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
@@ -46,6 +54,7 @@ public class User implements UserDetails {
         joinColumns = @JoinColumn(name = "user_id"),
         inverseJoinColumns = @JoinColumn(name = "permission_id")
     )
+    @Builder.Default
     private Set<Permission> permissions = new HashSet<>();
 
     @PrePersist
@@ -73,7 +82,7 @@ public class User implements UserDetails {
     @Override public boolean isAccountNonExpired()   { return true; }
     @Override public boolean isAccountNonLocked()    { return isActive; }
     @Override public boolean isCredentialsNonExpired() { return true; }
-    @Override public boolean isEnabled()             { return isActive; }
+    @Override public boolean isEnabled()             { return isActive && !invitationPending; }
 
-    public enum Role { STUDENT, FACULTY, ADMIN }
+    public enum Role { STUDENT, FACULTY, ADMIN, ACCOUNTANT }
 }

@@ -33,6 +33,12 @@ public class Fee {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amountPaid;
 
+    @Builder.Default
+    @Column(name="concession_amount",nullable=false,precision=12,scale=2)
+    private BigDecimal concessionAmount = BigDecimal.ZERO;
+
+    public BigDecimal netAmount() { return amount.subtract(concessionAmount == null ? BigDecimal.ZERO : concessionAmount); }
+
     @Column(nullable = false)
     private LocalDate dueDate;
 
