@@ -51,29 +51,26 @@ public class FeeService {
     }
 
     public FeeResponse getByFeeId(String feeId) {
-        return feeRepo.findAll().stream()
-            .filter(f -> f.getFeeId().equals(feeId))
-            .findFirst()
+        return feeRepo.findByFeeId(feeId)
             .map(FeeResponse::from)
             .orElseThrow(() -> new NoSuchElementException("Fee not found: " + feeId));
     }
 
     @Transactional
     public FeeResponse pay(String feeId, FeeRequest.PayRequest req) {
-        Fee fee = feeRepo.findAll().stream()
-            .filter(f -> f.getFeeId().equals(feeId))
-            .findFirst()
+        Fee fee = feeRepo.findByFeeIdForUpdate(feeId)
             .orElseThrow(() -> new NoSuchElementException("Fee not found: " + feeId));
 
+        if (fee.getStatus() == Fee.Status.WAIVED) throw new IllegalArgumentException("Cannot collect payment against a waived fee");
         BigDecimal newPaid = fee.getAmountPaid().add(req.amountPaid);
-        if (newPaid.compareTo(fee.getAmount()) > 0)
+        if (newPaid.compareTo(fee.netAmount()) > 0)
             throw new IllegalArgumentException("Payment exceeds fee amount");
 
         fee.setAmountPaid(newPaid);
         fee.setPaidDate(LocalDate.now());
         if (req.remarks != null) fee.setRemarks(req.remarks);
 
-        if (newPaid.compareTo(fee.getAmount()) == 0) {
+        if (newPaid.compareTo(fee.netAmount()) == 0) {
             fee.setStatus(Fee.Status.PAID);
         } else {
             fee.setStatus(Fee.Status.PARTIAL);
@@ -84,9 +81,7 @@ public class FeeService {
 
     @Transactional
     public FeeResponse waive(String feeId, String remarks) {
-        Fee fee = feeRepo.findAll().stream()
-            .filter(f -> f.getFeeId().equals(feeId))
-            .findFirst()
+        Fee fee = feeRepo.findByFeeIdForUpdate(feeId)
             .orElseThrow(() -> new NoSuchElementException("Fee not found: " + feeId));
         fee.setStatus(Fee.Status.WAIVED);
         if (remarks != null) fee.setRemarks(remarks);

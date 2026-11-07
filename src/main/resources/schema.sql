@@ -7,8 +7,10 @@ CREATE TABLE IF NOT EXISTS users (
     email         VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     full_name     VARCHAR(255) NOT NULL,
-    role          VARCHAR(50)  NOT NULL CHECK (role IN ('STUDENT','FACULTY','ADMIN')),
+    role          VARCHAR(50)  NOT NULL CHECK (role IN ('STUDENT','FACULTY','ADMIN','ACCOUNTANT')),
     is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
+    invitation_pending BOOLEAN NOT NULL DEFAULT FALSE,
+    token_version INTEGER NOT NULL DEFAULT 0,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );

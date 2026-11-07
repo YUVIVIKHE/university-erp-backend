@@ -8,6 +8,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface FeeRepository extends JpaRepository<Fee, Long> {
+    java.util.Optional<Fee> findByFeeId(String feeId);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT f FROM Fee f WHERE f.feeId=:feeId")
+    java.util.Optional<Fee> findByFeeIdForUpdate(@Param("feeId") String feeId);
 
     boolean existsByFeeId(String feeId);
 

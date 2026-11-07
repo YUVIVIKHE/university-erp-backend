@@ -58,7 +58,7 @@ public class AuthService {
         String email = jwtService.extractUsername(req.refreshToken());
         User   user  = userRepo.findByEmail(email).orElseThrow();
 
-        if (!jwtService.isValid(req.refreshToken(), user)) {
+        if (!jwtService.hasType(req.refreshToken(), "refresh") || !jwtService.isValid(req.refreshToken(), user)) {
             throw new IllegalArgumentException("Invalid or expired refresh token");
         }
 

@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/university_erp
-    username: yuvivikhe
-    password:
+    url: ${ERP_DB_URL:jdbc:postgresql://localhost:5432/university_erp}
+    username: ${ERP_DB_USERNAME}
+    password: ${ERP_DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -22,8 +22,13 @@ server:
   port: 8080
 
 app:
+  bootstrap:
+    admin-email: ${ERP_BOOTSTRAP_ADMIN_EMAIL:}
+    admin-password: ${ERP_BOOTSTRAP_ADMIN_PASSWORD:}
+  mail:
+    encryption-key: ${ERP_MAIL_ENCRYPTION_KEY:}
   jwt:
-    secret: 4b3f2a1e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a
+    secret: ${ERP_JWT_SECRET}
     expiration-ms: 86400000        # 24 hours
     refresh-expiration-ms: 604800000 # 7 days
 
