@@ -45,11 +45,14 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/finance/**").hasAnyRole("ACCOUNTANT", "ADMIN")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/student/**").hasAnyRole("STUDENT", "ADMIN", "FACULTY")
                 // Accountant access is limited to explicitly exposed finance APIs.
                 .requestMatchers("/api/**").access((authentication, context) ->
                     new AuthorizationDecision(authentication.get().isAuthenticated()
                         && authentication.get().getAuthorities().stream()
                             .noneMatch(a -> a.getAuthority().equals("ROLE_ACCOUNTANT"))
+                        && authentication.get().getAuthorities().stream()
+                            .noneMatch(a -> a.getAuthority().equals("ROLE_STUDENT"))
                         && authentication.get().getAuthorities().stream()
                             .noneMatch(a -> a.getAuthority().equals("ROLE_ANONYMOUS"))))
                 .anyRequest().authenticated()

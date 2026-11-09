@@ -120,6 +120,12 @@ public class FeeService {
         );
     }
 
+    public List<FeeResponse> getFeesForStudent(String studentEmail) {
+        return feeRepo.findByAdmissionEmail(studentEmail).stream()
+            .map(FeeResponse::from)
+            .toList();
+    }
+
     private String generateFeeId() {
         int year = Year.now().getValue();
         long count = feeRepo.count() + 1;

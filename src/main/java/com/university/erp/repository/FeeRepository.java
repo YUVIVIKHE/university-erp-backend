@@ -51,4 +51,7 @@ public interface FeeRepository extends JpaRepository<Fee, Long> {
     java.math.BigDecimal totalPaidByAdmission(@Param("admissionId") String admissionId);
 
     long countByAdmission_AdmissionId(String admissionId);
+
+    @Query("SELECT f FROM Fee f JOIN f.admission a WHERE LOWER(a.email) = LOWER(:email) ORDER BY f.createdAt DESC")
+    java.util.List<Fee> findByAdmissionEmail(@Param("email") String email);
 }
