@@ -18,9 +18,23 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({FinanceOverviewController.class, AuthController.class, com.university.erp.controller.finance.AccountantFeeController.class,com.university.erp.controller.finance.FeeStructureController.class,com.university.erp.controller.finance.BulkFeeAssignmentController.class,com.university.erp.controller.finance.FeeCollectionController.class,com.university.erp.controller.finance.FeeFollowupController.class,com.university.erp.controller.finance.ScholarshipController.class,com.university.erp.controller.finance.AwardApprovalController.class,com.university.erp.controller.finance.FeeRefundController.class,com.university.erp.controller.finance.OperatingFinanceController.class,com.university.erp.controller.finance.GeneralLedgerController.class,com.university.erp.controller.finance.BudgetController.class,com.university.erp.controller.finance.DisbursementController.class,com.university.erp.controller.finance.PayrollSetupController.class,com.university.erp.controller.finance.FinanceReportsController.class,com.university.erp.controller.finance.AccountantSettingsController.class,com.university.erp.controller.finance.FinanceActivityController.class})
+@WebMvcTest({com.university.erp.controller.finance.FinanceWorkspaceController.class,com.university.erp.controller.finance.AwardReversalController.class,FinanceOverviewController.class, AuthController.class, com.university.erp.controller.finance.AccountantFeeController.class,com.university.erp.controller.finance.FeeStructureController.class,com.university.erp.controller.finance.BulkFeeAssignmentController.class,com.university.erp.controller.finance.FeeCollectionController.class,com.university.erp.controller.finance.FeeFollowupController.class,com.university.erp.controller.finance.ScholarshipController.class,com.university.erp.controller.finance.AwardApprovalController.class,com.university.erp.controller.finance.FeeRefundController.class,com.university.erp.controller.finance.OperatingFinanceController.class,com.university.erp.controller.finance.GeneralLedgerController.class,com.university.erp.controller.finance.BudgetController.class,com.university.erp.controller.finance.DisbursementController.class,com.university.erp.controller.finance.PayrollSetupController.class,com.university.erp.controller.finance.FinanceReportsController.class,com.university.erp.controller.finance.AccountantSettingsController.class,com.university.erp.controller.finance.FinanceActivityController.class})
 @Import({SecurityConfig.class, JwtAuthFilter.class})
 class AccountantAccessTest {
+    @MockBean com.university.erp.service.finance.FinanceWorkspaceService workspace;
+    @org.junit.jupiter.api.Test void workspaceAndProfileRequireFinanceRole() throws Exception {
+        for(String path:new String[]{"/api/finance/workspace/health","/api/finance/workspace/approvals","/api/finance/workspace/profile"}){
+            mvc.perform(get(path)).andExpect(status().isUnauthorized());
+            for(String role:new String[]{"STUDENT","FACULTY"})mvc.perform(get(path).with(user("other").roles(role))).andExpect(status().isForbidden());
+        }
+        mvc.perform(put("/api/finance/workspace/profile").with(user("other").roles("STUDENT")).contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isForbidden());
+    }
+    @MockBean com.university.erp.service.finance.AwardReversalService reversals;
+    @org.junit.jupiter.api.Test void reversalQueueRequiresFinanceRole() throws Exception {
+        mvc.perform(get("/api/finance/award-reversals")).andExpect(status().isUnauthorized());
+        for(String role:new String[]{"STUDENT","FACULTY"})mvc.perform(get("/api/finance/award-reversals").with(user("other").roles(role))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/finance/award-reversals").with(user("staff").roles("ACCOUNTANT"))).andExpect(status().isOk());
+    }
     @MockBean com.university.erp.service.finance.FinanceReportDetailsService reportDetails;
     @MockBean com.university.erp.service.finance.FinanceReportsService reports;
     @Test void reportsAreFinanceOnlyAndReadOnly() throws Exception {
@@ -181,8 +195,9 @@ class AccountantAccessTest {
             mvc.perform(post("/api/finance/fee-assignments/structures/1/preview").with(user("other").roles(role))).andExpect(status().isForbidden());
         }
         for(String role:new String[]{"ACCOUNTANT","ADMIN"}) mvc.perform(get("/api/finance/fee-assignments/programs").with(user("staff").roles(role))).andExpect(status().isOk());
-        mvc.perform(post("/api/finance/fee-assignments/structures/1/preview").with(user("staff").roles("ACCOUNTANT")).contentType(MediaType.APPLICATION_JSON).content("{\"program\":\"\"}" )).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/finance/fee-assignments/structures/1/preview").with(user("staff").roles("ACCOUNTANT")).contentType(MediaType.APPLICATION_JSON).content("{\"batchYear\":1900}" )).andExpect(status().isBadRequest());
     }
+    @MockBean com.university.erp.service.finance.FeeStructureOptionsService structureOptions;
     @MockBean com.university.erp.service.finance.FeeStructureService structures;
     @Test void structureAccessAndValidation() throws Exception {
         mvc.perform(get("/api/finance/fee-structures")).andExpect(status().isUnauthorized());

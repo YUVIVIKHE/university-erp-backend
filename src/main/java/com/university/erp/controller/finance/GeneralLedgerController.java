@@ -14,6 +14,7 @@ import java.util.*;
 public class GeneralLedgerController {
     private final GeneralLedgerService service;
     @ModelAttribute void noCache(jakarta.servlet.http.HttpServletResponse response){response.setHeader("Cache-Control","no-store");}
+    @GetMapping("/journals/{id}") public Map<String,Object> journal(@PathVariable @Size(max=100) String id){return service.journal(id);}
     @GetMapping("/accounts") public List<Map<String,Object>> accounts(){return service.accounts();}
     @GetMapping("/journals") public Page<Map<String,Object>> journals(@RequestParam(defaultValue="") @Size(max=100) String search,@RequestParam(defaultValue="") String source,
         @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate until,@RequestParam(defaultValue="0") @Min(0) int page){return service.journals(search,source,from,until,page);}

@@ -13,7 +13,17 @@ public class FeeStructure {
     @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
     @Version private long version;
     @Column(nullable=false,length=120) private String name;
-    @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="course_id",nullable=false) private Course course;
+    @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="course_id") private Course course;
+    @Column(nullable=false,length=20) private String courseScope="LEGACY";
+    @Column(nullable=false) private boolean includeFinalYear;
+    @ManyToMany @JoinTable(name="finance_fee_structure_courses",joinColumns=@JoinColumn(name="structure_id"),inverseJoinColumns=@JoinColumn(name="course_id"))
+    @org.hibernate.annotations.BatchSize(size=20) private Set<Course> selectedCourses=new LinkedHashSet<>();
+    @ElementCollection @CollectionTable(name="finance_fee_structure_years",joinColumns=@JoinColumn(name="structure_id")) @Column(name="study_year")
+    @org.hibernate.annotations.BatchSize(size=20) private Set<Integer> studyYears=new TreeSet<>();
+    @ElementCollection @CollectionTable(name="finance_fee_structure_semesters",joinColumns=@JoinColumn(name="structure_id")) @Column(name="semester")
+    @org.hibernate.annotations.BatchSize(size=20) private Set<Integer> semesters=new TreeSet<>();
+    @ElementCollection @CollectionTable(name="finance_fee_structure_batches",joinColumns=@JoinColumn(name="structure_id")) @Column(name="batch_year")
+    @org.hibernate.annotations.BatchSize(size=20) private Set<Integer> batchYears=new TreeSet<>();
     @Column(nullable=false) private int academicYear;
     @Column(nullable=false) private int semester;
     private Integer batchYear;

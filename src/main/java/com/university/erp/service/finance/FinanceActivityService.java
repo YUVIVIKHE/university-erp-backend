@@ -25,7 +25,7 @@ public class FinanceActivityService {
    SELECT 'A-'||a.id,CASE WHEN a.action='USER_LOGIN' THEN 'ACCESS' ELSE 'SETTINGS' END,
      coalesce(u.email,'Deleted account'),a.action,NULL::integer,'SUCCESS',a.created_at
    FROM audit_logs a LEFT JOIN users u ON u.id=a.user_id
-   WHERE (a.action='USER_LOGIN' AND u.role='ACCOUNTANT') OR a.action IN('FINANCE_PREFERENCES_UPDATED','FINANCE_PASSWORD_CHANGED')
+   WHERE (a.action='USER_LOGIN' AND u.role='ACCOUNTANT') OR a.action IN('FINANCE_PREFERENCES_UPDATED','FINANCE_PASSWORD_CHANGED','FINANCE_PROFILE_UPDATED')
    """;
   String where=" WHERE created_at>=:from AND created_at<:until AND (:kind='' OR kind=:kind) AND (:outcome='' OR outcome=:outcome) AND (actor ILIKE :search ESCAPE '!' OR action ILIKE :search ESCAPE '!')";
   long count=jdbc.queryForObject("SELECT count(*) FROM ("+events+") e"+where,p,Long.class);

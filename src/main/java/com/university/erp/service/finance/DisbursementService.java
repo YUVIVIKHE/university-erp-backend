@@ -19,7 +19,7 @@ public class DisbursementService {
     private final ObjectMapper mapper;
     @Value("${app.finance.time-zone:Asia/Kolkata}") private String timeZone="Asia/Kolkata";
     public record VendorInput(@NotNull UUID requestId,@NotBlank @Size(max=150) String name,@Email @Size(max=255) String email){}
-    public record Active(@NotNull Boolean active){}
+    public record Active(@NotNull Boolean active,@Min(0) Long version){public Active(Boolean active){this(active,null);}}
     public record Invoice(@NotNull UUID requestId,@NotNull UUID vendorId,@NotBlank @Size(max=150) String reference,@NotNull LocalDate date,
         @NotNull @DecimalMin("0.01") @Digits(integer=10,fraction=2) BigDecimal amount,@NotBlank @Size(max=2000) String notes){}
     public record Payroll(@NotNull UUID requestId,@NotNull @Positive Long userId,@NotNull LocalDate month,@NotBlank @Size(max=150) String reference,@NotNull LocalDate date,
@@ -43,8 +43,11 @@ public class DisbursementService {
         var created=jdbc.queryForList("INSERT INTO finance_vendors(id,request_id,request_hash,name,email,created_by) VALUES(:id,:request,:hash,:name,:email,:actor) ON CONFLICT DO NOTHING RETURNING *",p);
         if(created.isEmpty())throw new ConflictException("Vendor name is already registered");return vendorRow(created.get(0));
     }
-    @Transactional public Map<String,Object> active(UUID id,boolean active){
-        var result=jdbc.queryForList("UPDATE finance_vendors SET active=:active WHERE id=:id RETURNING *",Map.of("id",id,"active",active));if(result.isEmpty())throw new NoSuchElementException("Vendor not found");return vendorRow(result.get(0));
+    @Transactional public Map<String,Object> active(UUID id,boolean active){return active(id,active,null,"Finance staff");}
+    @Transactional public Map<String,Object> active(UUID id,boolean active,Long version,String actor){
+        var rows=jdbc.queryForList("SELECT version FROM finance_vendors WHERE id=:id FOR UPDATE",Map.of("id",id));if(rows.isEmpty())throw new NoSuchElementException("Vendor not found");if(version!=null&&((Number)rows.get(0).get("version")).longValue()!=version)throw new ConflictException("Vendor changed. Reload before saving.");
+        jdbc.update("INSERT INTO finance_record_events(kind,record_id,action,actor,note) VALUES('VENDOR',:id,:action,:actor,:note)",Map.of("id",id,"action",active?"ACTIVATED":"DEACTIVATED","actor",actor,"note","Vendor availability changed"));
+        var result=jdbc.queryForList("UPDATE finance_vendors SET active=:active,version=version+1 WHERE id=:id RETURNING *",Map.of("id",id,"active",active));if(result.isEmpty())throw new NoSuchElementException("Vendor not found");return vendorRow(result.get(0));
     }
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public Page<Map<String,Object>> staff(String search,int page){

@@ -318,6 +318,36 @@ Full production build remains blocked by the existing unrelated Admin route
 `/dashboard/admission/[id]` (`useParams` during prerender, CLIENT_HOOK_DYNAMIC).
 Coordinate that route's rendering fix with the Admin teammate before deployment.
 
+## University-wide, multi-course and study-year fee plans
+
+Apply `021_fee_structure_scope.sql` after 020. Existing plans/runs remain LEGACY:
+their explicit admission-program, semester and optional batch filters are preserved.
+New plans choose SELECTED (one to 200 active courses) or UNIVERSITY (no course IDs).
+Semester 0 means all eligible semesters. Empty studyYears with includeFinalYear=false
+means all study years; otherwise explicit years and final year are combined with OR.
+Batch, optional semester, search, program and specific-ID filters further narrow
+eligibility. Creating/publishing a plan does not itself create student charges.
+
+Admissions currently have program text rather than a course FK. New course targeting
+uses an exact normalised course-name match, otherwise a unique active course-program
+match across the whole catalog. Ambiguous/unmapped courses do not qualify for selected
+course or final-year rules. They may still qualify for university-wide all-year or
+explicit-year rules. Preview reports unresolved course mappings and freezes the target
+IDs. Processing rechecks eligibility under admission locks and retains 25-account
+transactions, unique structure-line charges, expiry and resume/retry protection.
+
+Study year is ceil(semester/2), using the existing two-semesters-per-year convention.
+Final year requires a uniquely matched active course with a positive whole-year
+duration in months; course years = durationMonths/12. Configure academic course data
+before relying on this rule. This is not a new department/student database. A direct
+shared academic course mapping remains preferable to program-name resolution.
+
+Validation: 105 backend tests, frontend type/lint checks, live university/all-year,
+multi-course, selected-year, final-year (2/3/4-year course) and third-plus-final union
+checks; concurrent duplicates, changed eligibility, existing client compatibility,
+responsive forms at 1440/768/390px, and a 5,000-student frozen preview/batch check.
+Temporary fixtures are removed; local DEMO financial records are preserved.
+
 ## Checks and Git
 
 Backend: `mvn test` and `mvn package`.
@@ -326,3 +356,56 @@ Financial changes should also verify live balances, concurrent retries, separate
 review, rollback and receipt preservation. Keep meaningful regression tests and
 all required migrations in Git; exclude credentials, databases, build output,
 screenshots and local runtime logs.
+
+
+Fee cohort multi-selection: course, study-year, semester and admission-batch
+selectors support All or multiple values. Semester/year choices derive from active
+course duration (two semesters per year); admission batches come from approved
+admissions. Course catalogs refresh on opening/focus and support search/pagination.
+Apply additive manual migration `src/main/resources/db/manual/022_fee_multi_cohorts.sql` before starting this version. Legacy scalar cohort filters remain supported.
+
+
+Scholarship corrections and award reversals require additive manual migration
+`src/main/resources/db/manual/023_scholarship_corrections.sql`. Submitters may edit
+SUBMITTED/VERIFIED applications before final financial decision, with version
+checks, stored prior values and mandatory correction reasons. Edits reset document
+verification. Posted awards use a separately reviewed full reversal; original
+approvals/allocations and receipts remain intact. Approved reversals close the
+application and restore fee balances. The paginated reversal queue is available
+under `/api/finance/award-reversals`; finance roles only. Net award reports exclude
+approved reversals. Do not modify historical financial rows directly.
+
+
+Refund workflow additions require additive manual migration
+`src/main/resources/db/manual/024_refund_workflow.sql`. Requests have readable
+RF-numbers, source/category/evidence/target metadata and optimistic versions.
+`PUT /api/finance/refunds/{id}` corrects requester-owned pending requests and
+revalidates receipt reservations; verification is reset. `POST .../{id}/actions`
+records VERIFY, RETURN, PROCESSING, FAILED, READY or NOTE, with a mandatory note.
+Approval now requires separate-user verification. Approved unpaid refunds may be
+returned by another reviewer unless payout is processing. Failed payouts must be
+resolved before recording payment. PAID requires the existing verified payout
+endpoint; process tracking never changes money. `/api/finance/refunds/summary`
+returns search-scoped totals across statuses. Detail includes latest 100 events;
+correction/return snapshots remain in finance_refund_events. Existing approved
+refunds remain payable; existing paid refunds remain unchanged financially.
+Student login ownership mapping, student request screens and approved cancellation
+of fee liability require separate integration. STUDENT_OFFLINE only records an
+offline student request entered by Accounts and does not grant student API access.
+
+
+Finance workspace controls require additive migration
+`src/main/resources/db/manual/025_finance_workspace.sql`. Pending operating/vendor
+requests and budgets support creator-owned corrections with versions and stored
+history. Payroll amounts/authorisation snapshots stay locked. Approved unpaid
+entries support separate-review RETURN and READY/PROCESSING/FAILED tracking;
+only verified settlement changes cash. Settled records allow follow-up notes only.
+Vendor contacts have versioned edits; invoice snapshots remain intact.
+`/api/finance/workspace/profile` reads/updates only the authenticated user's display
+name and finance contact profile; email/role/activation remain Admin-controlled.
+Profile department text is not a payroll/academic mapping. The workspace also
+provides read-only queue counts, current all-time consistency checks and bounded
+per-record history. Ledger journal detail is `/api/finance/ledger/journals/{id}`.
+These controls do not add bank reconciliation, statutory payroll, approved-budget
+amendments or tenant isolation. Review the local demo guide's completion matrix
+before presenting capabilities as production-ready.

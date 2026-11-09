@@ -17,6 +17,8 @@ public class ScholarshipController {
         @RequestParam(defaultValue="") String status,@RequestParam(defaultValue="0") @Min(0) int page,
         jakarta.servlet.http.HttpServletResponse response){response.setHeader("Cache-Control","no-store");return service.list(search,status,page);}
     @PostMapping public Map<String,Object> create(@Valid @RequestBody ScholarshipService.Input input,Principal actor){return service.create(input,actor.getName());}
+    @PutMapping("/{id}") public Map<String,Object> edit(@PathVariable UUID id,@Valid @RequestBody ScholarshipService.Edit input,Principal actor){return service.edit(id,input,actor.getName());}
+    @GetMapping("/{id}/edits") public List<Map<String,Object>> edits(@PathVariable UUID id){return service.edits(id);}
     @PostMapping("/{id}/review") public Map<String,Object> review(@PathVariable UUID id,@Valid @RequestBody ScholarshipService.Review input,Principal actor){return service.review(id,input,actor.getName());}
     @ExceptionHandler({jakarta.validation.ConstraintViolationException.class,org.springframework.http.converter.HttpMessageNotReadableException.class,org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class}) @ResponseStatus(org.springframework.http.HttpStatus.BAD_REQUEST)
     public com.university.erp.dto.ApiError invalid(){return com.university.erp.dto.ApiError.of(400,"Invalid scholarship application or filter");}

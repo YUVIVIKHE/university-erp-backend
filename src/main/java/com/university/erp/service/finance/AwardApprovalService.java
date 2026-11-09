@@ -21,7 +21,7 @@ public class AwardApprovalService {
     private final ObjectMapper mapper;
     @Value("${app.finance.time-zone:Asia/Kolkata}") private String timeZone="Asia/Kolkata";
     public record Input(@NotNull UUID requestId,@NotBlank String outcome,@NotBlank @Size(max=2000) String note,
-        @NotNull @Size(max=100) List<@NotNull @Valid Allocation> allocations){}
+        @NotNull @Size(max=100) List<@NotNull @Valid Allocation> allocations,@Min(0) Long version){public Input(UUID requestId,String outcome,String note,List<Allocation> allocations){this(requestId,outcome,note,allocations,null);}}
     static BigDecimal validate(Input input,BigDecimal requested){
         if(!Set.of("POSTED","DECLINED").contains(input.outcome()))throw new IllegalArgumentException("Invalid approval outcome");
         FeeCollectionService.ordered(input.allocations());
@@ -39,7 +39,7 @@ public class AwardApprovalService {
     public Page<Map<String,Object>> list(String search,String stage,int page){
         if(!Set.of("PENDING","POSTED","DECLINED").contains(stage))throw new IllegalArgumentException("Invalid approval stage");
         var p=new MapSqlParameterSource("search","%"+search.trim()+"%").addValue("offset",page*20L).addValue("stage",stage);
-        String where=" WHERE s.status='VERIFIED' AND s.funding='INSTITUTION' AND (s.scheme ILIKE :search OR s.admission_id ILIKE :search OR a.first_name||' '||a.last_name ILIKE :search) AND "+(stage.equals("PENDING")?"d.id IS NULL":"d.outcome=:stage");
+        String where=" WHERE (s.status='VERIFIED' OR EXISTS(SELECT 1 FROM finance_award_reversals r WHERE r.decision_id=d.id AND r.status='APPROVED')) AND s.funding='INSTITUTION' AND (s.scheme ILIKE :search OR s.admission_id ILIKE :search OR a.first_name||' '||a.last_name ILIKE :search) AND "+(stage.equals("PENDING")?"d.id IS NULL":"d.outcome=:stage");
         long total=jdbc.queryForObject("SELECT count(*)"+FROM+where,p,Long.class);
         var rows=jdbc.queryForList("SELECT s.*,a.first_name||' '||a.last_name AS student_name,a.program,d.id AS decision_id,d.outcome,d.amount AS approved_amount,d.note AS decision_note,d.decided_by,d.created_at AS decided_at"+FROM+where+" ORDER BY s.created_at,s.id LIMIT 20 OFFSET :offset",p);
         return new PageImpl<>(rows,PageRequest.of(page,20),total);
@@ -49,6 +49,7 @@ public class AwardApprovalService {
         var rows=jdbc.queryForList("SELECT * FROM finance_award_decisions WHERE application_id=:app",Map.of("app",application));
         if(rows.isEmpty())throw new NoSuchElementException("Financial decision not found");
         var result=new LinkedHashMap<>(rows.get(0));
+        result.put("reversals",jdbc.queryForList("SELECT * FROM finance_award_reversals WHERE decision_id=:id ORDER BY created_at DESC,id",Map.of("id",result.get("id"))));
         result.put("allocations",jdbc.queryForList("SELECT fee_id,fee_type,amount,balance_before,balance_after FROM finance_concession_allocations WHERE decision_id=:id ORDER BY fee_id",Map.of("id",result.get("id"))));return result;
     }
     @Transactional public Map<String,Object> decide(UUID application,Input input,String actor){
@@ -64,6 +65,7 @@ public class AwardApprovalService {
             if(input.requestId().equals(previous.get("request_id"))&&hash.equals(previous.get("request_hash"))&&actor.equals(previous.get("decided_by")))return decision(application);
             throw new ConflictException("A final financial decision already exists for this application");
         }
+        if(input.version()!=null&&((Number)app.get("version")).longValue()!=input.version())throw new ConflictException("Application changed. Refresh before financial review.");
         if(actor.equals(app.get("created_by")))throw new ConflictException("You cannot approve or decline your own application");
         if(!app.get("status").equals("VERIFIED"))throw new ConflictException("Documents must be verified first");
         if(!app.get("funding").equals("INSTITUTION"))throw new ConflictException("External scholarship funding requires reconciliation, not a fee concession");

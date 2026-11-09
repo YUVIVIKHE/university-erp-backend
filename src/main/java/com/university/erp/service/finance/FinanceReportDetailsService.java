@@ -48,9 +48,9 @@ public class FinanceReportDetailsService {
     p.addValue("until",java.sql.Date.valueOf(today));
    }
    case "awards" -> {
-    query="SELECT s.category||' / '||s.funding||' / '||s.status||' / '||coalesce(d.outcome,'UNDECIDED') AS label,count(*) AS applications,sum(s.requested_amount) AS requested,coalesce(sum(d.amount) FILTER(WHERE d.outcome='POSTED'),0) AS posted FROM finance_scholarship_applications s LEFT JOIN finance_award_decisions d ON d.application_id=s.id WHERE (s.created_at AT TIME ZONE 'Asia/Kolkata')::date BETWEEN :from AND :until GROUP BY 1";
+    query="SELECT s.category||' / '||s.funding||' / '||s.status||' / '||CASE WHEN EXISTS(SELECT 1 FROM finance_award_reversals r WHERE r.decision_id=d.id AND r.status='APPROVED') THEN 'REVERSED' ELSE coalesce(d.outcome,'UNDECIDED') END AS label,count(*) AS applications,sum(s.requested_amount) AS requested,coalesce(sum(d.amount) FILTER(WHERE d.outcome='POSTED' AND NOT EXISTS(SELECT 1 FROM finance_award_reversals r WHERE r.decision_id=d.id AND r.status='APPROVED')),0) AS posted FROM finance_scholarship_applications s LEFT JOIN finance_award_decisions d ON d.application_id=s.id WHERE (s.created_at AT TIME ZONE 'Asia/Kolkata')::date BETWEEN :from AND :until GROUP BY 1";
     totals="SELECT coalesce(sum(applications),0) AS applications,coalesce(sum(requested),0) AS requested,coalesce(sum(posted),0) AS posted FROM ("+query+") q";
-    columns=List.of("label","applications","requested","posted");basis="Applications created in the period, with current review/award status. Posted concessions are fee reductions, not incoming cash or external scholarship disbursements.";
+    columns=List.of("label","applications","requested","posted");basis="Applications created in the period, with current review/award status. Net posted concessions exclude approved reversals; these are fee reductions, not incoming cash or external scholarship disbursements.";
    }
    case "refunds" -> {
     query="SELECT status AS label,count(*) AS requests,sum(amount) AS amount FROM finance_refunds WHERE (created_at AT TIME ZONE 'Asia/Kolkata')::date BETWEEN :from AND :until GROUP BY status";

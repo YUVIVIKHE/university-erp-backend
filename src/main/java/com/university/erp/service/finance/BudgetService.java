@@ -79,6 +79,7 @@ public class BudgetService {
         var p=new MapSqlParameterSource("id",id);var rows=jdbc.queryForList("SELECT * FROM finance_budgets WHERE id=:id FOR UPDATE",p);
         if(rows.isEmpty())throw new NoSuchElementException("Budget not found");var b=rows.get(0);
         if(input.status().equals(b.get("status"))&&actor.equals(b.get("reviewed_by"))&&input.note().trim().equals(b.get("review_note")))return detail(id);
+        if(input.version()!=null&&((Number)b.get("version")).longValue()!=input.version())throw new ConflictException("Budget changed. Reload before review.");
         OperatingFinanceService.validateReview((String)b.get("status"),(String)b.get("created_by"),actor,input);
         if(input.status().equals("APPROVED")){
             // Serialize approvals, including different budgets for the same category/date range.
@@ -92,6 +93,6 @@ public class BudgetService {
             if(overlaps>0)throw new ConflictException("An approved budget already covers a selected category in this period");
         }
         p.addValue("status",input.status()).addValue("actor",actor).addValue("note",input.note().trim());
-        jdbc.update("UPDATE finance_budgets SET status=:status,reviewed_by=:actor,reviewed_at=now(),review_note=:note WHERE id=:id",p);return detail(id);
+        jdbc.update("UPDATE finance_budgets SET version=version+1,status=:status,reviewed_by=:actor,reviewed_at=now(),review_note=:note WHERE id=:id",p);jdbc.update("INSERT INTO finance_record_events(kind,record_id,action,actor,note) VALUES('BUDGET',:id,:status,:actor,:note)",p);return detail(id);
     }
 }

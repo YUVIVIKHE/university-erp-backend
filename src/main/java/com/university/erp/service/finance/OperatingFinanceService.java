@@ -22,9 +22,9 @@ public class OperatingFinanceService {
         @NotBlank @Size(max=150) String counterparty,@NotBlank @Size(max=150) String documentReference,
         @NotNull LocalDate documentDate,@NotNull @DecimalMin("0.01") @Digits(integer=10,fraction=2) BigDecimal amount,
         @NotBlank @Size(max=2000) String description){}
-    public record Review(@NotBlank String status,@NotBlank @Size(max=2000) String note){}
+    public record Review(@NotBlank String status,@NotBlank @Size(max=2000) String note,@Min(0) Long version){public Review(String status,String note){this(status,note,null);}}
     public record Settlement(@NotNull UUID requestId,@NotBlank String method,@NotBlank @Size(max=100) String reference,
-        @NotNull LocalDate paidDate,@NotNull @AssertTrue Boolean verified){}
+        @NotNull LocalDate paidDate,@NotNull @AssertTrue Boolean verified,@Min(0) Long version){public Settlement(UUID requestId,String method,String reference,LocalDate paidDate,Boolean verified){this(requestId,method,reference,paidDate,verified,null);}}
     public record Totals(long records,BigDecimal settledIncome,BigDecimal settledExpenses,BigDecimal netCash,
         BigDecimal pendingAmount,BigDecimal approvedAmount){}
     public record Worklist(Totals totals,Page<Map<String,Object>> entries,LocalDate asOf){}
@@ -57,10 +57,10 @@ public class OperatingFinanceService {
     public Worklist payrollPayments(String search,String status,int page){return listCategory(search,"EXPENSE",status,null,null,page,"PAYROLL");}
     private Worklist listCategory(String search,String direction,String status,LocalDate from,LocalDate until,int page,String dedicated){
         if(!Set.of("","INCOME","EXPENSE").contains(direction))throw new IllegalArgumentException("Invalid direction");
-        if(!Set.of("","PENDING","APPROVED","REJECTED","CANCELLED","SETTLED").contains(status))throw new IllegalArgumentException("Invalid entry status");
+        if(!Set.of("","PENDING","APPROVED","REJECTED","CANCELLED","SETTLED","READY","PROCESSING","FAILED").contains(status))throw new IllegalArgumentException("Invalid entry status");
         if(from!=null&&until!=null&&until.isBefore(from))throw new IllegalArgumentException("End date must be on or after start date");
         var p=new MapSqlParameterSource("search","%"+search.trim()+"%").addValue("direction",direction).addValue("status",status).addValue("offset",page*20L);
-        String where=" WHERE "+(dedicated.equals("VENDOR")?"vendor_id IS NOT NULL":dedicated.equals("PAYROLL")?"staff_user_id IS NOT NULL":"vendor_id IS NULL AND staff_user_id IS NULL")+" AND (:direction='' OR direction=:direction) AND (:status='' OR status=:status) AND (counterparty ILIKE :search OR document_reference ILIKE :search OR coalesce(settlement_reference,'') ILIKE :search) ";
+        String where=" WHERE "+(dedicated.equals("VENDOR")?"vendor_id IS NOT NULL":dedicated.equals("PAYROLL")?"staff_user_id IS NOT NULL":"vendor_id IS NULL AND staff_user_id IS NULL")+" AND (:direction='' OR direction=:direction) AND (:status='' OR status=:status OR (status='APPROVED' AND progress=:status)) AND (counterparty ILIKE :search OR document_reference ILIKE :search OR coalesce(settlement_reference,'') ILIKE :search) ";
         if(from!=null){where+=" AND document_date>=:from";p.addValue("from",java.sql.Date.valueOf(from));}
         if(until!=null){where+=" AND document_date<=:until";p.addValue("until",java.sql.Date.valueOf(until));}
         var totals=jdbc.queryForObject("""
@@ -76,6 +76,7 @@ public class OperatingFinanceService {
         var rows=jdbc.queryForList("SELECT * FROM finance_operating_entries WHERE id=:id",Map.of("id",id));
         if(rows.isEmpty())throw new NoSuchElementException("Operating entry not found");return publicRow(rows.get(0));
     }
+    private void event(UUID id,String action,String actor,String note){jdbc.update("INSERT INTO finance_record_events(kind,record_id,action,actor,note) VALUES('ENTRY',:id,:action,:actor,:note)",Map.of("id",id,"action",action,"actor",actor,"note",note));}
     @Transactional public Map<String,Object> create(Input input,String actor){
         validate(input,today());
         return persist(input,actor);
@@ -99,14 +100,15 @@ public class OperatingFinanceService {
             INSERT INTO finance_operating_entries(id,request_id,request_hash,direction,category,counterparty,document_reference,document_date,amount,description,created_by)
             VALUES(:id,:request,:hash,:direction,:category,:party,:reference,:date,:amount,:description,:actor) ON CONFLICT DO NOTHING
             """,p);
-        if(inserted==0)throw new ConflictException("An active entry already exists for this direction, counterparty and document reference");return detail((UUID)p.getValue("id"));
+        if(inserted==0)throw new ConflictException("An active entry already exists for this direction, counterparty and document reference");event((UUID)p.getValue("id"),"REQUESTED",actor,input.description().trim());return detail((UUID)p.getValue("id"));
     }
     @Transactional public Map<String,Object> review(UUID id,Review input,String actor){
         var rows=jdbc.queryForList("SELECT * FROM finance_operating_entries WHERE id=:id FOR UPDATE",Map.of("id",id));if(rows.isEmpty())throw new NoSuchElementException("Operating entry not found");var entry=rows.get(0);
         if(entry.get("staff_user_id")!=null&&!input.status().equals("CANCELLED")&&Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM users WHERE id=:staff AND email=:actor)",Map.of("staff",entry.get("staff_user_id"),"actor",actor),Boolean.class)))throw new ConflictException("The payroll beneficiary cannot review their own payout");
         if(input.status().equals(entry.get("status"))&&actor.equals(entry.get("reviewed_by"))&&input.note().trim().equals(entry.get("review_note")))return detail(id);
+        if(input.version()!=null&&((Number)entry.get("version")).longValue()!=input.version())throw new ConflictException("Entry changed. Reload before review.");
         validateReview((String)entry.get("status"),(String)entry.get("created_by"),actor,input);
-        jdbc.update("UPDATE finance_operating_entries SET status=:status,reviewed_by=:actor,reviewed_at=now(),review_note=:note WHERE id=:id",Map.of("id",id,"status",input.status(),"actor",actor,"note",input.note().trim()));return detail(id);
+        jdbc.update("UPDATE finance_operating_entries SET version=version+1,status=:status,reviewed_by=:actor,reviewed_at=now(),review_note=:note WHERE id=:id",Map.of("id",id,"status",input.status(),"actor",actor,"note",input.note().trim()));event(id,input.status(),actor,input.note().trim());return detail(id);
     }
     @Transactional public Map<String,Object> settle(UUID id,Settlement input,String actor){
         String method=FeeCollectionService.method(input.method()),reference=input.reference().trim().toUpperCase(Locale.ROOT);
@@ -117,8 +119,10 @@ public class OperatingFinanceService {
             if(input.requestId().equals(entry.get("settlement_request_id"))&&fingerprint.equals(entry.get("settlement_hash"))&&actor.equals(entry.get("settled_by")))return detail(id);
             throw new ConflictException("This entry already has a recorded settlement");
         }
+        if(input.version()!=null&&((Number)entry.get("version")).longValue()!=input.version())throw new ConflictException("Entry changed. Reload before settlement.");
+        if("FAILED".equals(entry.get("progress")))throw new ConflictException("Resolve the failed transaction and mark ready/processing before settlement");
         validateSettlement((String)entry.get("status"),((java.sql.Date)entry.get("document_date")).toLocalDate(),input.paidDate(),today());
-        jdbc.update("UPDATE finance_operating_entries SET status='SETTLED',settlement_request_id=:request,settlement_hash=:hash,settlement_method=:method,settlement_reference=:reference,settlement_date=:date,settled_by=:actor,settled_at=now() WHERE id=:id",p);
-        return detail(id);
+        jdbc.update("UPDATE finance_operating_entries SET status='SETTLED',progress='COMPLETED',version=version+1,settlement_request_id=:request,settlement_hash=:hash,settlement_method=:method,settlement_reference=:reference,settlement_date=:date,settled_by=:actor,settled_at=now() WHERE id=:id",p);
+        event(id,"SETTLED",actor,"Verified settlement: "+reference);return detail(id);
     }
 }

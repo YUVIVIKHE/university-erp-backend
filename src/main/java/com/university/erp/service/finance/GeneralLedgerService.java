@@ -29,6 +29,9 @@ public class GeneralLedgerService {
         long count=jdbc.queryForObject("SELECT count(*) FROM finance_ledger_entries"+where,p,Long.class);
         return new PageImpl<>(jdbc.queryForList("SELECT * FROM finance_ledger_entries"+where+" ORDER BY entry_date DESC,entry_id DESC LIMIT 20 OFFSET :offset",p),PageRequest.of(page,20),count);
     }
+    public Map<String,Object> journal(String id){
+        var p=Map.of("id",id);var rows=jdbc.queryForList("SELECT * FROM finance_ledger_entries WHERE entry_id=:id",p);if(rows.isEmpty())throw new NoSuchElementException("Journal not found");return Map.of("entry",rows.get(0),"lines",jdbc.queryForList("SELECT account_code,debit,credit FROM finance_ledger_lines WHERE entry_id=:id ORDER BY account_code",p));
+    }
     public Trial trial(LocalDate from,LocalDate until){
         var p=parameters(from,until);
         // All accounts, including zero balances. Period movements and closing balances remain distinct.
