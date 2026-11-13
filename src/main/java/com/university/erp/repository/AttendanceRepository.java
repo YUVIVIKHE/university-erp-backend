@@ -73,6 +73,14 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
         """)
     long countTotal(@Param("studentId") Long studentId, @Param("subjectCode") String subjectCode);
 
+    /** All attendance records for a student, newest first */
+    @Query("""
+        SELECT a FROM Attendance a
+        WHERE a.student.id = :studentId
+        ORDER BY a.date DESC, a.timeSlot ASC
+        """)
+    List<Attendance> findAllByStudentId(@Param("studentId") Long studentId);
+
     /** Per-subject attendance summary for a student's portal view */
     @Query(value = """
         SELECT a.subject_code  AS subjectCode,

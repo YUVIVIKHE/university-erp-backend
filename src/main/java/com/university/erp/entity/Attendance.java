@@ -8,7 +8,7 @@ import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "attendance", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"student_id", "subject_id", "date", "time_slot"})
+    @UniqueConstraint(columnNames = {"student_id", "subject_code", "date", "time_slot"})
 })
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Attendance {

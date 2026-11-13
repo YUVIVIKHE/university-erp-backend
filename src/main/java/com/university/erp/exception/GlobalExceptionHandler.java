@@ -77,9 +77,31 @@ public class GlobalExceptionHandler {
             .body(ApiError.of(404, ex.getMessage()));
     }
 
+    @ExceptionHandler({
+        org.springframework.web.bind.MissingServletRequestParameterException.class,
+        org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+        org.springframework.http.converter.HttpMessageNotReadableException.class
+    })
+    public ResponseEntity<ApiError> handleBadRequest(Exception ex) {
+        String message = switch (ex) {
+            case org.springframework.web.bind.MissingServletRequestParameterException m ->
+                "Missing required parameter: " + m.getParameterName();
+            case org.springframework.web.method.annotation.MethodArgumentTypeMismatchException m ->
+                "Invalid value for parameter: " + m.getName();
+            default -> "Request body is missing or malformed";
+        };
+        return ResponseEntity.badRequest().body(ApiError.of(400, message));
+    }
+
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNoResource(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.of(404, "Endpoint not found"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex) {
+        String detail = ex.getClass().getSimpleName() + ": " + ex.getMessage();
         return ResponseEntity.internalServerError()
-            .body(ApiError.of(500, "An unexpected error occurred"));
+            .body(ApiError.of(500, detail));
     }
 }
