@@ -14,6 +14,29 @@ import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> handleUnsupportedMethod(org.springframework.web.HttpRequestMethodNotSupportedException ex) {
+        var headers = new org.springframework.http.HttpHeaders();
+        if (ex.getSupportedHttpMethods() != null) headers.setAllow(ex.getSupportedHttpMethods());
+        return new ResponseEntity<>(ApiError.of(405, "HTTP method not supported for this endpoint"), headers, org.springframework.http.HttpStatus.METHOD_NOT_ALLOWED);
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiError> handleConfiguration(IllegalStateException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(ApiError.of(503, "Service configuration is incomplete. Check the server email encryption key and settings."));
+    }
+
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleDuplicate(org.springframework.dao.DataIntegrityViolationException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiError.of(409, "This record conflicts with an existing record. Refresh and try again."));
+    }
+
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(ApiError.of(403, "You do not have permission to perform this action"));
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex) {
@@ -54,9 +77,31 @@ public class GlobalExceptionHandler {
             .body(ApiError.of(404, ex.getMessage()));
     }
 
+    @ExceptionHandler({
+        org.springframework.web.bind.MissingServletRequestParameterException.class,
+        org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+        org.springframework.http.converter.HttpMessageNotReadableException.class
+    })
+    public ResponseEntity<ApiError> handleBadRequest(Exception ex) {
+        String message = switch (ex) {
+            case org.springframework.web.bind.MissingServletRequestParameterException m ->
+                "Missing required parameter: " + m.getParameterName();
+            case org.springframework.web.method.annotation.MethodArgumentTypeMismatchException m ->
+                "Invalid value for parameter: " + m.getName();
+            default -> "Request body is missing or malformed";
+        };
+        return ResponseEntity.badRequest().body(ApiError.of(400, message));
+    }
+
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNoResource(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.of(404, "Endpoint not found"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex) {
+        String detail = ex.getClass().getSimpleName() + ": " + ex.getMessage();
         return ResponseEntity.internalServerError()
-            .body(ApiError.of(500, "An unexpected error occurred"));
+            .body(ApiError.of(500, detail));
     }
 }

@@ -16,7 +16,7 @@ public interface DepartmentRepository extends JpaRepository<Department, Long> {
         SELECT d FROM Department d
         WHERE (:search = '' OR LOWER(d.name) LIKE LOWER(CONCAT('%',:search,'%'))
                             OR LOWER(d.code) LIKE LOWER(CONCAT('%',:search,'%'))
-                            OR LOWER(d.hodName) LIKE LOWER(CONCAT('%',:search,'%')))
+                            OR LOWER(d.deanName) LIKE LOWER(CONCAT('%',:search,'%')))
           AND (:status IS NULL OR d.status = :status)
         ORDER BY d.name ASC
         """)

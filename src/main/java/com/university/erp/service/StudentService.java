@@ -1,6 +1,7 @@
 package com.university.erp.service;
 
 import com.university.erp.dto.StudentResponse;
+import com.university.erp.dto.StudentUpdateRequest;
 import com.university.erp.entity.Admission;
 import com.university.erp.entity.Student;
 import com.university.erp.entity.User;
@@ -12,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.Year;
 import java.util.NoSuchElementException;
 
@@ -34,6 +36,22 @@ public class StudentService {
         return studentRepo.findByRollNumber(rollNumber)
             .map(StudentResponse::from)
             .orElseThrow(() -> new NoSuchElementException("Student not found: " + rollNumber));
+    }
+
+    @Transactional
+    public StudentResponse update(String rollNumber, StudentUpdateRequest req) {
+        Student s = studentRepo.findByRollNumber(rollNumber)
+            .orElseThrow(() -> new NoSuchElementException("Student not found: " + rollNumber));
+        if (req.program()       != null && !req.program().isBlank())  s.setProgram(req.program());
+        if (req.semester()      != null) s.setSemester(req.semester());
+        if (req.batchYear()     != null) s.setBatchYear(req.batchYear());
+        if (req.phone()         != null) s.setPhone(req.phone().isBlank() ? null : req.phone());
+        if (req.address()       != null) s.setAddress(req.address().isBlank() ? null : req.address());
+        if (req.guardianName()  != null) s.setGuardianName(req.guardianName().isBlank() ? null : req.guardianName());
+        if (req.guardianPhone() != null) s.setGuardianPhone(req.guardianPhone().isBlank() ? null : req.guardianPhone());
+        if (req.isActive()      != null) s.setActive(req.isActive());
+        if (req.dateOfBirth()   != null) s.setDateOfBirth(req.dateOfBirth().isBlank() ? null : LocalDate.parse(req.dateOfBirth()));
+        return StudentResponse.from(studentRepo.save(s));
     }
 
     /** Called when an admission is approved — creates User + Student records. */

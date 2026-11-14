@@ -31,7 +31,7 @@ public class CourseService {
             .name(req.name)
             .description(req.description)
             .program(req.program)
-            .credits(req.credits)
+            .credits(req.credits != null ? req.credits : 0)
             .durationMonths(req.durationMonths)
             .level(req.level)
             .mode(req.mode)
@@ -84,7 +84,7 @@ public class CourseService {
         course.setName(req.name);
         course.setDescription(req.description);
         course.setProgram(req.program);
-        course.setCredits(req.credits);
+        course.setCredits(req.credits != null ? req.credits : course.getCredits());
         course.setDurationMonths(req.durationMonths);
         course.setLevel(req.level);
         course.setMode(req.mode);

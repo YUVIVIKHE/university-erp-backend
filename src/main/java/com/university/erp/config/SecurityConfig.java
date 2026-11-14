@@ -2,6 +2,7 @@ package com.university.erp.config;
 
 import com.university.erp.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -18,6 +19,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -40,10 +42,25 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/me").authenticated()
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/finance/**").hasAnyRole("ACCOUNTANT", "ADMIN")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/student/**").hasAnyRole("STUDENT", "ADMIN", "FACULTY")
+                // Accountant access is limited to explicitly exposed finance APIs.
+                .requestMatchers("/api/**").access((authentication, context) ->
+                    new AuthorizationDecision(authentication.get().isAuthenticated()
+                        && authentication.get().getAuthorities().stream()
+                            .noneMatch(a -> a.getAuthority().equals("ROLE_ACCOUNTANT"))
+                        && authentication.get().getAuthorities().stream()
+                            .noneMatch(a -> a.getAuthority().equals("ROLE_STUDENT"))
+                        && authentication.get().getAuthorities().stream()
+                            .noneMatch(a -> a.getAuthority().equals("ROLE_ANONYMOUS"))))
                 .anyRequest().authenticated()
             )
+            .exceptionHandling(errors -> errors
+                .authenticationEntryPoint((request, response, error) -> response.setStatus(401))
+                .accessDeniedHandler((request, response, error) -> response.setStatus(403)))
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
             .build();
@@ -67,10 +84,13 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    @Value("${app.cors.allowed-origins:http://localhost:3000}")
+    private List<String> allowedOrigins;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:3000"));
+        config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

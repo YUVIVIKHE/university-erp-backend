@@ -8,6 +8,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface FeeRepository extends JpaRepository<Fee, Long> {
+    java.util.Optional<Fee> findByFeeId(String feeId);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT f FROM Fee f WHERE f.feeId=:feeId")
+    java.util.Optional<Fee> findByFeeIdForUpdate(@Param("feeId") String feeId);
 
     boolean existsByFeeId(String feeId);
 
@@ -47,4 +51,7 @@ public interface FeeRepository extends JpaRepository<Fee, Long> {
     java.math.BigDecimal totalPaidByAdmission(@Param("admissionId") String admissionId);
 
     long countByAdmission_AdmissionId(String admissionId);
+
+    @Query("SELECT f FROM Fee f JOIN f.admission a WHERE LOWER(a.email) = LOWER(:email) ORDER BY f.createdAt DESC")
+    java.util.List<Fee> findByAdmissionEmail(@Param("email") String email);
 }

@@ -1,0 +1,24 @@
+package com.university.erp.controller.finance;
+import com.university.erp.service.finance.BudgetService;
+import com.university.erp.service.finance.OperatingFinanceService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.security.access.prepost.PreAuthorize;
+import java.security.Principal;
+import java.util.*;
+@RestController @RequestMapping("/api/finance/budgets") @RequiredArgsConstructor @Validated
+@PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+public class BudgetController {
+    private final BudgetService service;
+    @ModelAttribute void noCache(jakarta.servlet.http.HttpServletResponse response){response.setHeader("Cache-Control","no-store");}
+    @GetMapping public Page<Map<String,Object>> list(@RequestParam(defaultValue="") @Size(max=100) String search,@RequestParam(defaultValue="") String status,@RequestParam(defaultValue="0") @Min(0) int page){return service.list(search,status,page);}
+    @GetMapping("/{id}") public Map<String,Object> detail(@PathVariable UUID id){return service.detail(id);}
+    @PostMapping public Map<String,Object> create(@Valid @RequestBody BudgetService.Input input,Principal actor){return service.create(input,actor.getName());}
+    @PostMapping("/{id}/review") public Map<String,Object> review(@PathVariable UUID id,@Valid @RequestBody OperatingFinanceService.Review input,Principal actor){return service.review(id,input,actor.getName());}
+    @ExceptionHandler({jakarta.validation.ConstraintViolationException.class,org.springframework.http.converter.HttpMessageNotReadableException.class,org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class}) @ResponseStatus(org.springframework.http.HttpStatus.BAD_REQUEST)
+    public com.university.erp.dto.ApiError invalid(){return com.university.erp.dto.ApiError.of(400,"Invalid budget request or filter");}
+}

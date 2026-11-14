@@ -10,8 +10,11 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 
 public interface StudentRepository extends JpaRepository<Student, Long> {
-    Optional<Student> findByRollNumber(String rollNumber);
-    Optional<Student> findByUserId(Long userId);
+    @Query("SELECT s FROM Student s JOIN FETCH s.user WHERE s.rollNumber = :rollNumber")
+    Optional<Student> findByRollNumber(@Param("rollNumber") String rollNumber);
+
+    @Query("SELECT s FROM Student s JOIN FETCH s.user WHERE s.user.id = :userId")
+    Optional<Student> findByUserId(@Param("userId") Long userId);
     boolean existsByRollNumber(String rollNumber);
 
     @Query("""

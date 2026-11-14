@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 
 public interface AdmissionRepository extends JpaRepository<Admission, Long> {
+    Optional<Admission> findFirstByEmailIgnoreCaseAndStatus(String email, Admission.Status status);
 
     Optional<Admission> findByAdmissionId(String admissionId);
 
