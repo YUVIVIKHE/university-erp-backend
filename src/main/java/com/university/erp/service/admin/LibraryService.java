@@ -71,9 +71,15 @@ public class LibraryService {
         return new PageOf<>(rows, total, (int) Math.ceil(total / (double) size), Math.max(page, 0));
     }
 
+    @Transactional(readOnly = true)
     public List<String> categories() {
         return jdbc.queryForList("SELECT DISTINCT category FROM library_books WHERE category IS NOT NULL AND category <> '' ORDER BY 1",
             Map.of(), String.class);
+    }
+
+    @Transactional(readOnly = true)
+    public Book getBook(long id) {
+        return book(id);
     }
 
     private Book book(long id) {
@@ -186,6 +192,15 @@ public class LibraryService {
             + " ORDER BY (li.status = 'ISSUED') DESC, li.due_date ASC, li.id DESC LIMIT :limit OFFSET :offset",
             p, issueMapper(settings.getInt("libraryFinePerDay")));
         return new PageOf<>(rows, total, (int) Math.ceil(total / (double) size), Math.max(page, 0));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Issue> currentIssuesForStudent(long studentId) {
+        var p = new MapSqlParameterSource("studentId", studentId);
+        String where = ISSUE_FROM + " WHERE li.student_id = :studentId AND li.status = 'ISSUED' ";
+        return jdbc.query("SELECT li.*, b.title, b.accession_no, s.roll_number, s.program, u.full_name " + where
+                + " ORDER BY li.due_date ASC, li.id DESC",
+            p, issueMapper(settings.getInt("libraryFinePerDay")));
     }
 
     private Issue issue(long id) {

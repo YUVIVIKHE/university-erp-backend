@@ -20,7 +20,7 @@ public class JwtService {
     private final long      refreshExpirationMs;
 
     public JwtService(
-        @Value("${app.jwt.secret}")                  String secret,
+        @Value("${app.jwt.secret:dev-university-erp-jwt-secret-key-2025}") String secret,
         @Value("${app.jwt.expiration-ms}")           long   expirationMs,
         @Value("${app.jwt.refresh-expiration-ms}")   long   refreshExpirationMs
     ) {
