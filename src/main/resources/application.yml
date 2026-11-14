@@ -19,7 +19,7 @@ spring:
       mode: never
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8081}
 
 app:
   cors:
@@ -28,10 +28,13 @@ app:
   bootstrap:
     admin-email: ${ERP_BOOTSTRAP_ADMIN_EMAIL:}
     admin-password: ${ERP_BOOTSTRAP_ADMIN_PASSWORD:}
+    student-email: ${ERP_BOOTSTRAP_STUDENT_EMAIL:}
+    student-password: ${ERP_BOOTSTRAP_STUDENT_PASSWORD:}
+    student-reset-password: ${ERP_BOOTSTRAP_STUDENT_RESET_PASSWORD:false}
   mail:
     encryption-key: ${ERP_MAIL_ENCRYPTION_KEY:}
   jwt:
-    secret: ${ERP_JWT_SECRET}
+    secret: ${ERP_JWT_SECRET:dev-university-erp-jwt-secret-key-2025}
     expiration-ms: 86400000        # 24 hours
     refresh-expiration-ms: 604800000 # 7 days
 
